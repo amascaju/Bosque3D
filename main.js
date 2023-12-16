@@ -2,6 +2,7 @@ import './style.css'
 import * as THREE from "three";
 import {OrbitControls} from "three/examples/jsm/controls/OrbitControls";
 import {GLTFLoader} from "three/examples/jsm/loaders/GLTFLoader";
+import gsap from 'gsap'
 
 // Escena de la animació
 const scene = new THREE.Scene();
@@ -69,6 +70,7 @@ scene.add(dirlight);
 const light = new THREE.AmbientLight( 0x404040 );
 scene.add(light);
 
+// Importar model bosc
 let forest = null;
 ImportGLTF(
   forest,
@@ -78,27 +80,148 @@ ImportGLTF(
   0
 );
 
+// Importar model Deu del bosc
 let godForest = null;
-ImportGLTF(
-  godForest,
-  'Models/GodOfForest/scene.gltf',
-  new THREE.Vector3(18,-0.2,5),
-  new THREE.Vector3(1,1,1),
-  0
-);
+ImportGod();
 
+// Importar model aranya
 let spider = null;
-ImportGLTF(
-  spider,
-  'Models/Spider/scene.gltf',
-  new THREE.Vector3(-8.75,5,-2.1),
-  new THREE.Vector3(20,20,20),
-  Math.PI/2
-);
+ImportSpider();
 
+// Importar objecte buid amb model del llop
+let pareWolf = new THREE.Object3D();
 let wolf = null;
-let mixer = null
+let mixer = null;
+let correr = null;
 ImportWolf();
+scene.add(pareWolf);
+
+// Array de punts d'interes
+const points = [
+  {
+      position: new THREE.Vector3(0, 0, 0),
+      element: document.querySelector('.point-0')
+  },
+  {
+    position: new THREE.Vector3(0, 0, 0),
+    element: document.querySelector('.point-1')
+  },
+  {
+    position: new THREE.Vector3(0, 0, 0),
+    element: document.querySelector('.point-2')
+  }
+]
+let target = new THREE.Vector3();
+
+document.getElementById("tarantula").onclick = function() {FocusSpider()};
+document.getElementById("god").onclick = function() {FocusGod()};
+document.getElementById("wolf").onclick = function() {FocusWolf()};
+document.getElementById("boto").onclick = function() {GoBack()};
+
+let rotationWolf = true;
+document.getElementById("wolf").addEventListener("mouseover", function(){
+  correr.stop();
+  rotationWolf = false
+})
+
+document.getElementById("wolf").addEventListener("mouseout", function(){
+  if (!clickWolf) {
+    correr.play();
+    rotationWolf = true;
+  }
+})
+
+let enableOrbit = true;
+
+function FocusSpider(){
+  if (spider) {
+    enableOrbit = false
+    document.getElementById("wolf").style.display = "none";
+    document.getElementById("god").style.display = "none";
+    gsap.to(camera.position,
+      { duration: 3,
+        x: -8.75, 
+        y: 5, 
+        z: -1,
+        onUpdate: function() {
+          camera.lookAt(new THREE.Vector3(-8.75,5,-2.1))
+        },
+        onComplete: function() {
+          document.getElementById("textSpider").style.display = "block";
+          document.getElementById("boto").style.display = "block";
+        },
+        ease: "expo.inOut" })
+  }
+}
+
+let clickWolf = false;
+function FocusGod(){
+  if (godForest) {
+    document.getElementById("wolf").style.display = "none";
+    document.getElementById("tarantula").style.display = "none";
+    enableOrbit = false
+    gsap.to(camera.position,
+      { duration: 3,
+        x: 27, 
+        y: 5.5, 
+        z: 11.5,
+        onUpdate: function() {
+          camera.lookAt(godForest.position)
+        },
+        onComplete: function() {
+          document.getElementById("textGod").style.display = "block";
+          document.getElementById("boto").style.display = "block";
+        },
+        ease: "expo.inOut" })
+  }
+}
+
+function FocusWolf(){
+  if (wolf) {
+    clickWolf = true;
+    enableOrbit = false
+    document.getElementById("tarantula").style.display = "none";
+    document.getElementById("god").style.display = "none";
+    gsap.to(camera.position,
+      { duration: 3,
+        x: target.x - 2, 
+        y: target.y + 1, 
+        z: target.z - 2,
+        onUpdate: function() {
+          camera.lookAt(target)
+        },
+        onComplete: function() {
+          document.getElementById("textWolf").style.display = "block";
+          document.getElementById("boto").style.display = "block";
+        },
+        ease: "expo.inOut" })
+  }
+}
+
+function GoBack(){
+  document.getElementById("textWolf").style.display = "none";
+  document.getElementById("textSpider").style.display = "none";
+  document.getElementById("textGod").style.display = "none";
+  document.getElementById("boto").style.display = "none";
+  gsap.to(camera.position,
+    { duration: 3,
+      x: 5, 
+      y: 15, 
+      z: 5,
+      onUpdate: function() {
+        camera.lookAt(new THREE.Vector3(0,0,0));
+      },
+      onComplete: function() {
+        clickWolf = false;
+        enableOrbit = true
+        correr.play();
+        rotationWolf = true;
+        document.getElementById("tarantula").style.display = "block";
+        document.getElementById("god").style.display = "block";
+        document.getElementById("wolf").style.display = "block";
+      },
+      ease: "expo.inOut" })
+}
 
 let time = Date.now();
 //Iniciam el bucle
@@ -109,11 +232,45 @@ function AnimationLoop(){
     let thisTime = Date.now();
     let deltaTime = thisTime - time;
     time = thisTime;
-    
-    if(mixer) {
-      mixer.update(deltaTime)
+
+    if (enableOrbit) {
+      controls.enabled = true;
+      controls.update();
+    } else {
+      controls.enabled = false;
     }
 
+    if (wolf) {
+      wolf.getWorldPosition( target );
+    }
+    for(const point of points) {
+      if (wolf && point.element.classList.contains("point-0")) {
+        point.position = target;
+        point.position.y = 2;
+      }
+      if (spider && point.element.classList.contains("point-1")) {
+        point.position = spider.position.clone()
+        point.position.y = 4.4;
+      }
+      if (godForest && point.element.classList.contains("point-2")) {
+        point.position = godForest.position.clone()
+        point.position.x = 22;
+        point.position.y = 5;
+      }
+      const screenPosition = point.position.clone()
+      screenPosition.project(camera)
+      const translateX = screenPosition.x * window.innerWidth * 0.5
+      const translateY = - screenPosition.y * window.innerHeight * 0.5
+      point.element.style.transform = `translateX(${translateX}px) translateY(${translateY}px)`
+    }
+
+    if(mixer) {
+      mixer.update(deltaTime * 0.001)
+    }
+
+    if (rotationWolf) {
+      pareWolf.rotateY(deltaTime * 0.001)
+    }
 
     renderer.render(scene,camera);
     requestAnimationFrame(AnimationLoop);
@@ -158,12 +315,69 @@ function ImportWolf(){
       function (gltf){
           // Si es carrega correctament s'afageix a l'escena.
           wolf = gltf.scene;
-          wolf.position.set(0,0,0);
+          wolf.position.set(0,0,6);
           wolf.scale.set(2,2,2);
-          scene.add(wolf);
+          wolf.rotateY(Math.PI/2);
+          pareWolf.add(wolf);
+          //scene.add(wolf);
           mixer = new THREE.AnimationMixer(gltf.scene)
-          const action = mixer.clipAction(gltf.animations[0])
-          action.play()
+          correr = mixer.clipAction(gltf.animations[0])
+          correr.play()
+      },
+      // Mira el procés de carrega del model dins la web.
+      function (xhr){
+          console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
+      },
+      // Treu els errors en cas de que en tengui.
+      function (error){
+          console.log("Error: " + error);
+      }
+
+  );
+}
+
+function ImportGod(){
+
+  const loader = new GLTFLoader();
+
+  loader.load(
+      // Ruta al model
+      'Models/GodOfForest/scene.gltf',
+      // FUNCIONS DE CALLBACK
+      function (gltf){
+          // Si es carrega correctament s'afageix a l'escena.
+          godForest = gltf.scene;
+          godForest.position.set(18,-0.2,5);
+          godForest.scale.set(1,1,1);
+          scene.add(godForest);
+      },
+      // Mira el procés de carrega del model dins la web.
+      function (xhr){
+          console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
+      },
+      // Treu els errors en cas de que en tengui.
+      function (error){
+          console.log("Error: " + error);
+      }
+
+  );
+}
+
+function ImportSpider(){
+
+  const loader = new GLTFLoader();
+
+  loader.load(
+      // Ruta al model
+      'Models/Spider/scene.gltf',
+      // FUNCIONS DE CALLBACK
+      function (gltf){
+          // Si es carrega correctament s'afageix a l'escena.
+          spider = gltf.scene;
+          spider.position.set(-8.75,5,-2.1);
+          spider.scale.set(20,20,20);
+          spider.rotateX(Math.PI/2);
+          scene.add(spider);
       },
       // Mira el procés de carrega del model dins la web.
       function (xhr){
