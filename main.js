@@ -2,6 +2,8 @@ import './style.css'
 import * as THREE from "three";
 import {OrbitControls} from "three/examples/jsm/controls/OrbitControls";
 import {GLTFLoader} from "three/examples/jsm/loaders/GLTFLoader";
+import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
+import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js';
 import gsap from 'gsap'
 
 // Escena de la animació
@@ -24,6 +26,89 @@ const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 
 document.body.appendChild(renderer.domElement);
+
+// VR
+document.body.appendChild( VRButton.createButton( renderer ) );
+renderer.xr.enabled = true;
+
+const controller1 = renderer.xr.getController( 0 );
+const controller2 = renderer.xr.getController( 1 );
+
+function onSelectStart() {
+  this.userData.isSelecting = true;
+}
+
+function onSelectEnd() {
+  this.userData.isSelecting = false;
+}
+
+controller1.addEventListener( 'selectstart', onSelectStart);
+controller1.addEventListener( 'selectend', onSelectEnd );
+controller1.addEventListener( 'connected', function ( event ) {
+    this.add( buildController( event.data ) );
+} );
+
+controller2.addEventListener( 'selectstart', onSelectStart);
+controller2.addEventListener( 'selectend',  onSelectEnd);
+controller2.addEventListener( 'connected', function ( event ) {
+    this.add( buildController( event.data ) );
+} );
+controller2.addEventListener( 'disconnected', function () {
+  this.remove( this.children[ 0 ] );
+} );
+
+scene.add(controller1)
+scene.add(controller2)
+
+const controllerModelFactory = new XRControllerModelFactory();
+
+const controllerGrip1 = renderer.xr.getControllerGrip( 0 );
+controllerGrip1.add( controllerModelFactory.createControllerModel( controllerGrip1 ) );
+scene.add( controllerGrip1 );
+
+const controllerGrip2 = renderer.xr.getControllerGrip( 1 );
+controllerGrip2.add( controllerModelFactory.createControllerModel( controllerGrip2 ) );
+scene.add( controllerGrip2 );
+
+function buildController( data ) {
+  let geometry, material;
+  switch ( data.targetRayMode ) {
+
+      case 'tracked-pointer':
+          geometry = new THREE.BufferGeometry();
+          geometry.setAttribute( 'position', 
+                         new THREE.Float32BufferAttribute( [ 0, 0, 0, 0, 0, - 1 ], 3 ) )
+          geometry.setAttribute( 'color', 
+                         new THREE.Float32BufferAttribute( [ 0.5, 0.5, 0.5, 0, 0, 0 ], 3 ) )
+          material = new THREE.LineBasicMaterial( 
+                        { 
+                          vertexColors: true, 
+                          blending: THREE.AdditiveBlending
+                        }
+           )
+      return new THREE.Line( geometry, material )
+
+      case 'gaze':
+
+      geometry = new THREE.RingGeometry( 0.02, 0.04, 32 ).translate(0,0, - 1)
+      material = new THREE.MeshBasicMaterial( { 
+                  opacity: 0.5, 
+                  transparent: true
+        } )
+      return new THREE.Mesh( geometry, material )
+  }
+}
+
+function handleController( controller ) {
+  if ( controller.userData.isSelecting ) {
+  // Acció en prémer el botó de Select del controlador
+  console.log('Selecting')
+  }
+}
+
+
+
+// -----------------------------------------------------------------------------------------------------------------------------------  
 
 // Controls de camera amb el mouse
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -272,8 +357,12 @@ function AnimationLoop(){
       pareWolf.rotateY(deltaTime * 0.001)
     }
 
+    handleController( controller1 );
+    handleController( controller2 );
+
     renderer.render(scene,camera);
-    requestAnimationFrame(AnimationLoop);
+    renderer.setAnimationLoop(AnimationLoop);
+    //requestAnimationFrame(AnimationLoop);
 }
 
 function ImportGLTF(obj, path, position, scale, rotateX){
