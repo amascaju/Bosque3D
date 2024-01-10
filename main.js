@@ -4,6 +4,7 @@ import {OrbitControls} from "three/examples/jsm/controls/OrbitControls";
 import {GLTFLoader} from "three/examples/jsm/loaders/GLTFLoader";
 import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
 import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js';
+import CANNON from 'cannon'
 import gsap from 'gsap'
 
 // Escena de la animació
@@ -27,7 +28,7 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 
 document.body.appendChild(renderer.domElement);
 
-// VR
+// --------------------------- VR -----------------------------------------
 document.body.appendChild( VRButton.createButton( renderer ) );
 renderer.xr.enabled = true;
 
@@ -105,6 +106,58 @@ function handleController( controller ) {
   console.log('Selecting')
   }
 }
+
+
+
+// -----------------------------------------------------------------------------------------------------------------------------------  
+
+// -------------------------------------------       FISIQUES       ------------------------------------------------------------------  
+
+const geometry = new THREE.SphereGeometry( 1, 12, 6 ); 
+const material = new THREE.MeshBasicMaterial( { color: 0xffff00 } ); 
+const sphere = new THREE.Mesh( geometry, material );
+scene.add( sphere );
+
+const world = new CANNON.World()
+
+world.gravity.set(0, - 9.82, 0)
+
+const defaultMaterial  = new CANNON.Material('default')
+
+const defaultContactMaterial = new CANNON.ContactMaterial(
+  defaultMaterial,
+  defaultMaterial,
+  {
+      friction: 0.1,
+      restitution: 0.7
+  }
+)
+
+world.addContactMaterial(defaultContactMaterial)
+
+world.defaultContactMaterial = defaultContactMaterial
+
+const sphereShape = new CANNON.Sphere(1)
+
+const sphereBody = new CANNON.Body({
+  mass: 1,
+  position: new CANNON.Vec3(0, 6, 0),
+  shape: sphereShape,
+  //material: defaultMaterial
+})
+
+sphereBody.applyLocalForce(new CANNON.Vec3(150, 0, 0), new CANNON.Vec3(0, 0, 0))
+
+world.addBody(sphereBody)
+
+const floorShape = new CANNON.Plane()
+const floorBody = new CANNON.Body()
+//floorBody.material = defaultMaterial
+floorBody.mass = 0
+floorBody.addShape(floorShape)
+floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(- 1, 0, 0), Math.PI * 0.5)
+world.addBody(floorBody)
+
 
 
 
@@ -359,6 +412,11 @@ function AnimationLoop(){
 
     handleController( controller1 );
     handleController( controller2 );
+
+    sphereBody.applyForce(new CANNON.Vec3(- 0.1, 0, 0), sphereBody.position)
+    world.step(1 / 60, deltaTime, 3)
+    console.log(sphereBody.position.y)
+    sphere.position.copy(sphereBody.position)
 
     renderer.render(scene,camera);
     renderer.setAnimationLoop(AnimationLoop);
